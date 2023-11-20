@@ -697,6 +697,7 @@ static-files:
 #
 # Generate custom threshold and navdata files for modified airports
 #
+release: thresholds navdata
 
 thresholds: ${VENV} ${AIRPORTS}
 	. ${VENV} && python3 ${SCRIPT_DIR}/gen-thresholds.py ${SCENERY_DIR}/Airports ${DATA_DIR}/airports/${BUCKET}/apt.dat
@@ -704,11 +705,16 @@ thresholds: ${VENV} ${AIRPORTS}
 thresholds-clean:
 	rm -rf ${SCENERY_DIR}/Airports
 
-navdata: ${SCENERY_DIR}/NavData/apt/${BUCKET}.apt
+# navdata: ${SCENERY_DIR}/NavData/apt/${BUCKET}.apt
 
-${SCENERY_DIR}/NavData/apt/${BUCKET}.apt: ${AIRPORTS}
+# ${SCENERY_DIR}/NavData/apt/${BUCKET}.apt: ${AIRPORTS}
+# 	mkdir -p ${SCENERY_DIR}/NavData/apt
+# 	cp -v ${AIRPORTS} ${SCENERY_DIR}/NavData/apt/${BUCKET}.dat
+
+navdata:
 	mkdir -p ${SCENERY_DIR}/NavData/apt
-	cp -v ${AIRPORTS} ${SCENERY_DIR}/NavData/apt/${BUCKET}.dat
+	cat ${AIRPORTS} | python3 scripts/split-airports.py ${SCENERY_DIR}/NavData
+
 
 
 archive: static-files navdata thresholds-clean thresholds
@@ -728,6 +734,8 @@ update-download-links: ${VENV}
 	git add ${HTML_DIR}/download-links.json ${HTML_DIR}/download-links.txt
 	git commit -m 'Update download links'
 	git push origin main
+
+
 
 #
 # Set up Python when needed

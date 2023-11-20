@@ -219,7 +219,8 @@ def dump_tower(dir, facility):
     x = X.SubElement(p, 'tower')
     y = X.SubElement(x, 'twr')
     for prop in ('lon', 'lat', 'elev-m',):
-        X.SubElement(y, prop, twr[prop])
+        el = X.SubElement(y, prop)
+        el.text = twr[prop]    
 
     save_xml(filename, p)
 

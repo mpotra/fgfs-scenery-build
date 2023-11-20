@@ -11,7 +11,7 @@ with io.open(sys.stdin.fileno(),'r',encoding='latin-1') as input:
         result = re.match(r'^1\s+\d+\s+\d+\s+\d+\s+([a-zA-Z0-9]+).*$', line)
         if result:
             code = result.group(1)
-            filename = "{}/{}.apt.dat".format(output_dir, code)
+            filename = "{}/apt/{}.dat".format(output_dir, code)
             with open(filename, 'w') as output:
                 print(line, file=output, end='')
                 for line in input:
