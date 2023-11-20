@@ -217,6 +217,18 @@ lc-herbaceous-tree-shrub lc-sparse-vegetation lc-cropland		\
 lc-paddy-field lc-cropland-other-vegetation lc-mangrove lc-wetland	\
 lc-gravel-rock lc-sand lc-urban lc-snow-ice
 
+LC_AREAS_CORINE=lc-urban lc-town lc-builtupcover lc-transport \
+lc-port lc-airport lc-open-mining lc-dump lc-construction \
+lc-greenspace lc-golf-course lc-dry-crop lc-irr-crop \
+lc-rice lc-vineyard lc-orchard lc-olives lc-crop-grass-cover \
+lc-mixed-crop lc-complex-crop lc-natural-crop lc-agro-forest \
+lc-broad-leaved lc-coniferous-forest lc-mixed-forest \
+lc-natural-grassland lc-moors-heath lc-sclerophyllous \
+lc-shrub lc-beaches-sand lc-rock lc-barren-vegetation \
+lc-burnt-areas lc-glacier lc-marshes lc-bog lc-salt-marsh \
+lc-salines lc-intertidal-flats lc-water-streams \
+lc-water-lakes lc-lagoons lc-estuaries lc-ocean
+
 OSM_AREAS=osm-abandoned-railway osm-breakwater-man_made-areas		\
 osm-breakwater-man_made-lines osm-brownfield-landuse			\
 osm-cemetery-landuse osm-cliff-natural osm-commercial-landuse		\
@@ -243,6 +255,7 @@ osm-wood-natural-evergreen osm-wood-natural-mixed			\
 osm-wood-natural-unspecified
 
 PREPARE_AREAS=${DEM_AREAS} ${AIRPORT_AREAS} ${LC_AREAS} ${OSM_AREAS}
+PREPARE_AREAS_CORINE=${DEM_AREAS} ${AIRPORT_AREAS} ${LC_AREAS_CORINE} ${OSM_AREAS}
 
 #
 # Build flags
@@ -662,7 +675,7 @@ osm-clean:
 
 scenery-eu:
 	${TERRA_GEAR_BIN}/tg-construct --ignore-landmass --nudge=${NUDGE} --threads=${MAX_THREADS} --work-dir=${WORK_DIR} --output-dir=${SCENERY_DIR}/Terrain \
-	  ${LATLON_OPTS} --priorities=${CONFIG_DIR}/default_priorities.txt ${PREPARE_AREAS}
+	  ${LATLON_OPTS} --priorities=${CONFIG_DIR}/default_priorities.txt ${PREPARE_AREAS_CORINE}
 
 scenery: extract prepare
 	tg-construct --ignore-landmass --nudge=${NUDGE} --threads=${MAX_THREADS} --work-dir=${WORK_DIR} --output-dir=${SCENERY_DIR}/Terrain \
