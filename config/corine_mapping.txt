@@ -1,0 +1,45 @@
+CLC Code 	CLC Class Name 	Flightgear material (none=Default) 	Rationale
+111 	Continuous urban fabric 	Urban
+112 	Discontinuous urban fabric 	Town
+121 	Industrial or commercial units 	BuiltUpCover
+122 	Road and rail networks and associated land 	Transport
+123 	Port areas 	Port
+124 	Airports 	Airport 	See the note below
+131 	Mineral extraction sites 	OpenMining
+132 	Dump sites 	Dump
+133 	Construction sites 	Construction
+141 	Green urban areas 	Greenspace
+142 	Sport and leisure facilities 	GolfCourse
+211 	Non-irrigated arable land 	DryCropPastureCover or DryCrop
+212 	Permanently irrigated land 	IrrCrop
+213 	Rice fields 	Rice
+221 	Vineyards 	Vineyard
+222 	Fruit trees and berry plantations 	Orchard
+223 	Olive groves 	Olives
+231 	Pastures 	CropGrass/MixedCrop
+241 	Annual crops associated with permanent crops 	MixedCrop
+242 	Complex cultivation patterns 	ComplexCrop
+243 	Principally occupied by agriculture, with significant natural vegetation 	NaturalCrop
+244 	Agro-forestry areas 	AgroForest
+311 	Broad-leaved forest 	DeciduousForest
+312 	Coniferous forest 	EvergreenForest
+313 	Mixed forest 	MixedForest
+321 	Natural grasslands 	Grassland
+322 	Moors and heathland 	Heath
+323 	Sclerophyllous vegetation 	Sclerophyllous
+324 	Transitional woodland-shrub 	ShrubGrassCover
+331 	Beaches, dunes, sands 	Sand
+332 	Bare rocks 	Rock
+333 	Sparsely vegetated areas 	BarrenCover
+334 	Burnt areas 	Burnt
+335 	Glaciers and perpetual snow 	Glacier
+411 	Inland marshes 	Marsh
+412 	Peat bogs 	Bog
+421 	Salt marshes 	SaltMarsh
+422 	Salines 	Saline
+423 	Intertidal flats 	Littoral
+511 	Water courses 	Stream
+512 	Water bodies 	Lake
+521 	Coastal lagoons 	Lagoon
+522 	Estuaries 	Estuary
+523 	Sea and ocean 	Ocean 

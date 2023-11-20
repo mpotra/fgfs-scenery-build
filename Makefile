@@ -220,7 +220,7 @@ lc-gravel-rock lc-sand lc-urban lc-snow-ice
 LC_AREAS_CORINE=lc-urban lc-town lc-builtupcover lc-transport \
 lc-port lc-airport lc-open-mining lc-dump lc-construction \
 lc-greenspace lc-golf-course lc-dry-crop lc-irr-crop \
-lc-rice lc-vineyard lc-orchard lc-olives lc-crop-grass-cover \
+lc-rice lc-vineyard lc-orchard lc-olives lc-crop-grass \
 lc-mixed-crop lc-complex-crop lc-natural-crop lc-agro-forest \
 lc-broad-leaved lc-coniferous-forest lc-mixed-forest \
 lc-natural-grassland lc-moors-heath lc-sclerophyllous \
@@ -440,17 +440,6 @@ ${OSM_AREAS_EXTRACTED_FLAG}: ${OSM_PBF} ${OSM_PBF_CONF} bucket-flags-dir
 	ogrinfo -sql "CREATE SPATIAL INDEX ON ${BUCKET}-areas" ${OSM_AREAS_SHAPEFILE}
 	@touch $@
 
-# Extract CORINE landcover from PostgreSQL
-
-pg-landcover-extract: ${LANDCOVER_SHAPEFILE}
-
-# ${LANDCOVER_SHAPEFILE}:
-# 	@echo -e "\nExtracting PG background landcover for ${BUCKET}..."
-# 	ogr2ogr --debug ON -spat ${SPAT} -clipsrc -f "ESRI Shapefile" $@ ${LANDCOVER_PG_SOURCE} -sql "${LANDCOVER_PG_QUERY}"
-# 	@echo -e "\nCreating index for $@..."
-# 	ogrinfo -sql "CREATE SPATIAL INDEX ON ${BUCKET}" $@
-
-
 #
 # Extract airports
 #
@@ -593,6 +582,16 @@ ${LANDCOVER_LAYERS_CORINE_FLAG}: ${LANDCOVER_SHAPEFILE} ${CONFIG_DIR}/landcover-
 	done
 	mkdir -p ${FLAGS_DIR} && touch $@
 
+landcover-prepare-corine-crop-grass: ${WORK_DIR}/lc-crop-grass/${BUCKET}
+landcover-prepare-corine-shrub: ${WORK_DIR}/lc-shrub/${BUCKET}
+
+${WORK_DIR}/lc-crop-grass/${BUCKET}:
+	${TERRA_GEAR_BIN}/ogr-decode ${DECODE_OPTS} --area-type CropGrass --where "landcover=231" \
+	      ${WORK_DIR}/lc-crop-grass ${LANDCOVER_SHAPEFILE} || exit 1;
+
+${WORK_DIR}/lc-shrub/${BUCKET}:
+	${TERRA_GEAR_BIN}/ogr-decode ${DECODE_OPTS} --area-type ShrubGrassCover --where "landcover=324" \
+	      ${WORK_DIR}/lc-shrub ${LANDCOVER_SHAPEFILE} || exit 1;
 #
 # Prepare the foreground OSM layers
 #
@@ -675,7 +674,7 @@ osm-clean:
 
 scenery-eu:
 	${TERRA_GEAR_BIN}/tg-construct --ignore-landmass --nudge=${NUDGE} --threads=${MAX_THREADS} --work-dir=${WORK_DIR} --output-dir=${SCENERY_DIR}/Terrain \
-	  ${LATLON_OPTS} --priorities=${CONFIG_DIR}/default_priorities.txt ${PREPARE_AREAS_CORINE}
+	  ${LATLON_OPTS} --priorities=${CONFIG_DIR}/default_priorities_corine.txt ${PREPARE_AREAS_CORINE}
 
 scenery: extract prepare
 	tg-construct --ignore-landmass --nudge=${NUDGE} --threads=${MAX_THREADS} --work-dir=${WORK_DIR} --output-dir=${SCENERY_DIR}/Terrain \

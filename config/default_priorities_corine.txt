@@ -1,0 +1,94 @@
+Default  # First, the default area type (repeat below to identify as landmass)
+Ocean    # Second, the sliver type
+
+# From here, area types in order of descending priority
+Hole			hole	# Leave area completely empty
+Freeway			road
+Road			road
+Railroad		road
+Asphalt			road
+Airport			other
+Pond			lake
+Lake			lake
+DryLake			lake
+Reservoir		lake
+IntermittentLake	lake
+Stream			stream
+IntermittentStream	stream
+Watercourse		stream
+Canal			stream
+Cliffs                  cliff   # A cliff face
+Sand			other	# Sand-covered area
+Glacier			other	# Solid ice/snow
+PackIce			other	# Water with ice packs
+PolarIce		other
+Ocean			ocean
+Estuary			ocean
+Construction		other
+Port			other
+Dump			other	# Dump Site
+FloodLand		other	# Land subject to flooding
+Lagoon			other	# Lagoon
+Bog			other	# Bog
+Marsh			other	# Marshland or swamp
+SaltMarsh		other
+Saline			other	# Saline
+Littoral		other	# Tidal, Sand-covered area
+Dirt			other
+Rock			other	# Rock
+Lava			other	# Lava-covered area
+OpenMining		other	# OpenMining
+Greenspace		other
+
+# USGS Land Covers
+# These are low-priority, since known polygons should always win.
+
+Cemetery		other	# Cemetery
+DryCrop			other	# Dryland Cropland and Pasture
+IrrCrop			other	# Irrigated Cropland and Pasture
+Rice			other
+Vineyard		other
+Bamboo			other
+Mangrove		other
+ComplexCrop		other	# Complex Cropland
+NaturalCrop		other
+CropGrass		other	# Cropland/Grassland Mosaic
+CropWood		other	# Cropland/Woodland Mosaic
+AgroForest		other
+Olives			other
+GolfCourse		other	# GolfCourse
+GrassCover		other	# Grassland
+Grassland		other
+ScrubCover		other	# Scrub
+Scrub			other
+ShrubGrassCover		other	# Mixed Shrubland/Grassland
+SavannaCover		other	# Savanna
+Orchard			other	# Orchard
+DeciduousForest		other	# Deciduous Forest
+DeciduousBroadCover	other	# Deciduous Forest
+EvergreenForest		other	# Evergreen Forest
+EvergreenBroadCover	other	# Evergreen Forest
+RainForest		other	# Rain Forest
+MixedForest		other	# Mixed Forest
+MixedCrop		other	# Mixed Dryland/Irrigated Cropland and Pasture
+BarrenCover		other	# Barren or Sparsely Vegetated
+HerbTundra		other	# Herbaceous Tundra
+Sclerophyllous		other
+Heath			other
+Burnt			other
+SnowCover		other	# Snow or Ice
+
+# Moved down so that urban forests can pop
+Industrial		other
+Town                    other	# Urban and Built-Up Land
+SubUrban		other	# Densely-populated city or large town
+Urban			other	# Densely-populated city or large town
+Transport		other	# Transport
+BuiltUpCover		other	# Urban and Built-Up Land
+
+Island			island	# any island area not covered otherwise
+Default			landmass # any land area not covered otherwise
+
+Void			other
+Null			other
+Unknown			other
