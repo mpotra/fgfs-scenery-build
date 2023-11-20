@@ -47,8 +47,8 @@ latlon2bucket() {
 }
 
 for file in $DIR/*.hgt; do
-    lat_s=$(echo $file | sed -e 's/.*\([NS]..\).*/\1/')
-    lon_s=$(echo $file | sed -e 's/.*\([EW]...\).*/\1/')
+    lat_s=$(echo $file | sed -e 's/.*\([NSns]..\).*/\1/')
+    lon_s=$(echo $file | sed -e 's/.*\([EWew]...\).*/\1/')
     bucket=$(latlon2bucket $lat_s $lon_s)
     mkdir -p $DIR/$bucket && mv -v $file $DIR/$bucket
 done
