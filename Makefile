@@ -95,39 +95,45 @@
 
 # Basic setup
 SHELL=/bin/bash
-MAX_THREADS=1
+MAX_THREADS=4
 
 # Directories
-SCENERY_NAME=fgfs-canada-us-scenery
+SCENERY_NAME=fgfs-eu
 CONFIG_DIR=./config
 INPUTS_DIR=./01-inputs
 DATA_DIR=./02-prep
-WORK_DIR=./03-work
+WORK_DIR=./03-work/${BUCKET}
 OUTPUT_DIR=./04-output
 SCRIPT_DIR=./scripts
 STATIC_DIR=./static
 HTML_DIR=./docs
 SCENERY_DIR=${OUTPUT_DIR}/${SCENERY_NAME}
 PUBLISH_DIR="${HOME}/Dropbox/Downloads"
+BUCKETS_FILE=${CONFIG_DIR}/bucket-list-eu.txt
+TERRA_GEAR=/code/mpotra/flightgear/flightgear-terragear/fgbin
+TERRA_GEAR_BIN=${TERRA_GEAR}/bin
 
 # What area are we building (must be set)
-ifndef BUCKET
-$(error BUCKET is not defined)
-endif
+# ifndef BUCKET
+# $(error BUCKET is not defined)
+# endif
 
 # Extract coords from the bucket name
-MIN_LON:=$(shell echo ${BUCKET} | sed -e 's/^w0*/-/' -e 's/^e0*//' -e 's/[ns].*$$//')
+# MIN_LON:=$(shell echo ${BUCKET} | sed -e 's/^w0*/-/' -e 's/^e0*//' -e 's/[ns].*$$//')
+MIN_LON:=$(shell echo ${BUCKET} | sed -e 's/^w0*/-/' -e 's/^e0*//' -e 's/[ns].*$$//' -e 's/\s*/0/')
 MIN_LAT:=$(shell echo ${BUCKET} | sed -e 's/^.*s0*/-/' -e 's/^.*n//')
 MAX_LON:=$(shell expr ${MIN_LON} + 10)
 MAX_LAT:=$(shell expr ${MIN_LAT} + 10)
 
 MIN_FEATURE_AREA=0.00000004 # approx 200m^2 (for landcover and OSM area features)
+MIN_FEATURE_AREA_PG_METERS=40000 # approx 200m^2 (for landcover and OSM area features)
 
 #
 # Clip extents
 # Raster extent is padded one degree in each direction, for more-consistent polygons
 #
-QUADRANT_EXTENT=-180,0,0,90
+QUADRANT_EXTENT=-31,31,54,75
+#QUADRANT_EXTENT=-180,0,0,90
 RASTER_CLIP_EXTENT=$(shell expr ${MIN_LON} - 1) $(shell expr ${MAX_LAT} + 1) $(shell expr ${MAX_LON} + 1)  $(shell expr ${MIN_LAT} - 1)
 SPAT=${MIN_LON} ${MIN_LAT} ${MAX_LON} ${MAX_LAT}
 LATLON_OPTS=--min-lon=${MIN_LON} --min-lat=${MIN_LAT} --max-lon=${MAX_LON} --max-lat=${MAX_LAT}
@@ -141,26 +147,34 @@ TERRAFIT_OPTS=-j ${MAX_THREADS} -m 50 -x 10000 -e 10
 #
 
 AIRPORTS_SOURCE=${INPUTS_DIR}/airports/apt.dat
-LANDCOVER_SOURCE_DIR=${INPUTS_DIR}/global-landcover
+LANDCOVER_SOURCE_DIR=${INPUTS_DIR}/landcover-eu
 
 OSM_DIR=${INPUTS_DIR}/osm
-OSM_PLANET=${OSM_DIR}/planet-latest.osm.pbf
-OSM_SOURCE=${OSM_DIR}/hemisphere-nw.osm.pbf
+OSM_PLANET=${OSM_DIR}/europe-latest.osm.pbf
+OSM_SOURCE=${OSM_DIR}/europe-latest.osm.pbf
 OSM_PBF_CONF=config/osmconf.ini
 
-LANDMASS_SOURCE=${INPUTS_DIR}/land-polygons-split-4326/land_polygons.shp # complete version is very slow
-LANDCOVER_BASE=landcover-nw-clipped
+# LANDMASS_SOURCE=${INPUTS_DIR}/land_polygons/land_polygons.shp # complete version is very slow
+# LANDMASS_SOURCE=${INPUTS_DIR}/landmass-eu/Europe_coastline_poly.shp
+# LANDMASS_SOURCE=${INPUTS_DIR}/landmass-eu/landmass-eu.shp
+LANDMASS_SOURCE=${INPUTS_DIR}/v0_landmass/v0_landmass.shp
+LANDCOVER_BASE=landcover-eu
 LANDCOVER_SOURCE=${LANDCOVER_SOURCE_DIR}/${LANDCOVER_BASE}.shp
+
+LANDCOVER_PG_BASE=landcover.corine_landcover
+LANDCOVER_PG_QUERY=SELECT ST_MakeValid(wkb_geometry) AS geometry, ogc_fid as fid, code_18, shape_area FROM ${LANDCOVER_PG_BASE}
+LANDCOVER_PG_SOURCE=PG:"host=localhost user=postgres dbname=landcover password=postgres"
 
 # Output dir for per-area shapefiles
 SHAPEFILES_DIR=${DATA_DIR}/shapefiles/${BUCKET}
 
 # DEM type (SRTM-3 or FABDEM); FABDEM is higher res, but goes only to 80N
-ifeq ($(MIN_LAT), 80)
+# ifeq ($(MIN_LAT), 80)
+# DEM=SRTM-3
+# else
+# DEM=FABDEM
+# endif
 DEM=SRTM-3
-else
-DEM=FABDEM
-endif
 
 #
 # Data extracts (specific to bucket)
@@ -169,8 +183,15 @@ endif
 LANDMASS_SHAPEFILE=${DATA_DIR}/landmass/${BUCKET}.shp
 LANDCOVER_SHAPEFILE=${DATA_DIR}/landcover/${BUCKET}.shp
 OSM_PBF=${DATA_DIR}/osm/${BUCKET}.osm.pbf
+OSM_PBF_EU=${DATA_DIR}/osm/europe-latest.osm.pbf
 OSM_LINES_SHAPEFILE=${DATA_DIR}/osm/${BUCKET}-lines.shp
 OSM_AREAS_SHAPEFILE=${DATA_DIR}/osm/${BUCKET}-areas.shp
+OSM_FEATURES_DIR_ALL=${DATA_DIR}/osm/europe-latest
+
+$(mkdir -p ${OSM_FEATURES_DIR_ALL})
+
+OSM_LINES_SHAPEFILE_ALL=${DATA_DIR}/osm/europe-latest-lines.shp
+OSM_AREAS_SHAPEFILE_ALL=${DATA_DIR}/osm/europe-latest-areas.shp
 
 # Queries for creating intermediate shapefiles from the OSM PBF
 # TODO this duplicates info in config/osm-layers.tsv; we need it all in one place
@@ -229,11 +250,23 @@ PREPARE_AREAS=${DEM_AREAS} ${AIRPORT_AREAS} ${LC_AREAS} ${OSM_AREAS}
 
 FLAGS_BASE=./flags
 FLAGS_DIR=${FLAGS_BASE}/${BUCKET}
+FLAGS_DIR_ALL=${FLAGS_BASE}/europe-latest
 
 NUDGE=0
 
 OSM_AREAS_EXTRACTED_FLAG=${FLAGS_DIR}/osm-areas-extracted.flag
 OSM_LINES_EXTRACTED_FLAG=${FLAGS_DIR}/osm-lines-extracted.flag
+OSM_AREAS_EXTRACTED_FLAG_ALL=${FLAGS_DIR_ALL}/osm-areas-extracted.flag
+OSM_LINES_EXTRACTED_FLAG_ALL=${FLAGS_DIR_ALL}/osm-lines-extracted.flag
+
+ifdef BUCKET
+$(bucket-flags-dir)
+endif
+
+
+$(echo "${FLAGS_DIR_ALL}")
+
+$(mkdir -p ${FLAGS_DIR_ALL})
 
 LANDCOVER_SHAPEFILES_PREPARED_FLAG=${FLAGS_DIR}/landcover-shapefiles-prepared.flag
 
@@ -242,6 +275,7 @@ ELEVATIONS_FIT_FLAG=${FLAGS_DIR}/${DEM}-elevations-fit.flag
 AIRPORTS_FLAG=${FLAGS_DIR}/${DEM}-airports.flag # depends on DEM as well as BUCKET
 LANDMASS_FLAG=${FLAGS_DIR}/landmass.flag
 LANDCOVER_LAYERS_FLAG=${FLAGS_DIR}/landcover-areas.flag
+LANDCOVER_LAYERS_CORINE_FLAG=${FLAGS_DIR}/landcover-corine-areas.flag
 OSM_AREA_LAYERS_FLAG=${FLAGS_DIR}/osm-areas.flag
 OSM_LINE_LAYERS_FLAG=${FLAGS_DIR}/osm-lines.flag
 
@@ -253,6 +287,11 @@ VENV=./venv/bin/activate
 #
 # Top-level targets (assume elevations are already in place)
 #
+
+
+bucket-flags-dir:
+	@echo -e "Creating bucket flags dir ${FLAGS_DIR}"
+	mkdir -p ${FLAGS_DIR}
 
 all: extract prepare
 
@@ -281,13 +320,14 @@ extract-rebuild: extract-clean extract
 
 landmass-extract: ${LANDMASS_SHAPEFILE}
 
-landmass-extract-clean:
-	rm -rfv  ${LANDMASS_SHAPEFILE}
+# landmass-extract-clean:
+# 	rm -rfv  ${LANDMASS_SHAPEFILE}
 
 landmass-extract-rebuild: landmass-extract-clean landmass-extract
 
 ${LANDMASS_SHAPEFILE}: ${LANDMASS_SOURCE}
-	ogr2ogr -spat ${SPAT} ${LANDMASS_SHAPEFILE} ${LANDMASS_SOURCE}
+# ogr2ogr -spat ${SPAT} ${LANDMASS_SHAPEFILE} ${LANDMASS_SOURCE}
+	ogr2ogr -clipsrc ${SPAT} ${LANDMASS_SHAPEFILE} ${LANDMASS_SOURCE}
 
 #
 # Extract background landcover for current bucket
@@ -295,25 +335,36 @@ ${LANDMASS_SHAPEFILE}: ${LANDMASS_SOURCE}
 
 landcover-extract: ${LANDCOVER_SHAPEFILE}
 
-landcover-extract-clean:
-	rm -fv ${LANDCOVER_SHAPEFILE}
+# landcover-extract-clean:
+# 	rm -fv ${LANDCOVER_SHAPEFILE}
 
 landcover-extract-rebuild: landcover-extract-clean landcover-extract
 
-${LANDCOVER_SHAPEFILE}: ${LANDCOVER_SOURCE}
-	@echo -e "\nExtracting background landcover for ${BUCKET}..."
-	ogr2ogr -spat ${SPAT} $@ $< -dialect sqlite -sql "SELECT ST_MakeValid(geometry) AS geometry,* FROM '${LANDCOVER_BASE}'"
-	@echo -e "\nCreating index for $@..."
-	ogrinfo -sql "CREATE SPATIAL INDEX ON ${BUCKET}" $@
+# ${LANDCOVER_SHAPEFILE}: ${LANDCOVER_SOURCE}
+# 	@echo -e "\nExtracting background landcover for ${BUCKET}..."
+# 	ogr2ogr -spat ${SPAT} $@ $< -dialect sqlite -sql "SELECT ST_MakeValid(geometry) AS geometry,* FROM '${LANDCOVER_BASE}'"
+# 	@echo -e "\nCreating index for $@..."
+# 	ogrinfo -sql "CREATE SPATIAL INDEX ON ${BUCKET}" $@
 
 #
 # Extract OSM foreground features for current bucket
 #
 
-osm-extract: ${OSM_AREAS_EXTRACTED_FLAG} ${OSM_LINES_EXTRACTED_FLAG}
+osm-extract-eu:
+		IFS="\t" cat ${BUCKETS_FILE} | while read -r bucket; do \
+				echo -e "osm: Extracting $$bucket..."; \
+				BUCKET=$$bucket make osm-extract; \
+		done
 
-osm-extract-clean-all: osm-extract-clean
-	rm -rf  ${OSM_PBF}
+#osm-extract: ${OSM_AREAS_EXTRACTED_FLAG} ${OSM_LINES_EXTRACTED_FLAG}
+osm-extract: osm-extract-areas osm-extract-lines
+
+osm-extract-areas: ${OSM_AREAS_EXTRACTED_FLAG}
+
+osm-extract-lines: ${OSM_LINES_EXTRACTED_FLAG}
+
+# osm-extract-clean-all: osm-extract-clean
+# 	rm -rf  ${OSM_PBF}
 
 osm-extract-clean:
 	rm -rf ${OSM_AREAS_EXTRACTED_FLAG} ${OSM_AREAS_SHAPEFILE} ${OSM_LINES_EXTRACTED_FLAG} ${OSM_LINES_SHAPEFILE}
@@ -324,6 +375,8 @@ osm-extract-rebuild: osm-extract-clean osm-extract
 osm-quadrant: ${OSM_SOURCE}
 
 osm-pbf: ${OSM_PBF}
+
+osm-pbf-eu: ${OSM_PBF_EU}
 
 osm-areas-shapefile: ${OSM_AREAS_SHAPEFILE}
 
@@ -336,7 +389,29 @@ ${OSM_PBF}: ${OSM_SOURCE} # clip PBF to bucket to make processing more efficient
 	@echo -e "\nExtracting OSM PBF for ${BUCKET}..."
 	osmconvert $< -v -b=${MIN_LON},${MIN_LAT},${MAX_LON},${MAX_LAT} --complete-ways --complete-multipolygons --complete-boundaries -o=$@
 
-${OSM_LINES_EXTRACTED_FLAG}: ${OSM_PBF} ${OSM_PBF_CONF}
+${OSM_PBF_EU}: ${OSM_SOURCE} # clip PBF to bucket to make processing more efficient; no flag needed
+	@echo -e "\nExtracting OSM PBF for All of Europe..."
+	osmconvert $< -v --complete-ways --complete-multipolygons --complete-boundaries -o=$@
+
+# osm-pbf-to-buckets:
+# 		IFS="\t" cat ${BUCKETS_FILE} | while read -r bucket; do \
+# 				echo -e "Chopping ${OSM_PBF_EU} into $$bucket..."; \
+# 				BUCKET=$$bucket make osm-slice-into-bucket; \
+# 		done
+
+osm-slice-into-bucket: bucket-flags-dir
+ifneq ("$(wildcard $(OSM_PBF))","")
+	@echo "Skipping extracting ${OSM_PBF}"
+else
+	@echo -e "\nExtracting OSM PBF for bucket ${BUCKET}..."
+	osmconvert ${OSM_PBF_EU} -v -b=${MIN_LON},${MIN_LAT},${MAX_LON},${MAX_LAT} --complete-ways --complete-multipolygons --complete-boundaries -o=${OSM_PBF}
+endif
+# if [ -a ${OSM_PBF} ]; then \
+# 		@echo -e "\nExtracting OSM PBF for bucket ${BUCKET}..." \
+# 		osmconvert $< -v -b=${MIN_LON},${MIN_LAT},${MAX_LON},${MAX_LAT} --complete-ways --complete-multipolygons --complete-boundaries -o=${OSM_PBF} \
+# fi
+
+${OSM_LINES_EXTRACTED_FLAG}: ${OSM_PBF} ${OSM_PBF_CONF} bucket-flags-dir
 	@echo -e "\nExtracting foreground OSM line features for ${BUCKET}..."
 	@rm -f $@ ${OSM_LINES_SHAPEFILE}
 	ogr2ogr -oo CONFIG_FILE="${OSM_PBF_CONF}" -spat ${SPAT} -progress ${OSM_LINES_SHAPEFILE} ${OSM_PBF} -sql "SELECT * FROM lines WHERE ${OSM_LINES_QUERY}"
@@ -344,13 +419,23 @@ ${OSM_LINES_EXTRACTED_FLAG}: ${OSM_PBF} ${OSM_PBF_CONF}
 	ogrinfo -sql "CREATE SPATIAL INDEX ON ${BUCKET}-lines" ${OSM_LINES_SHAPEFILE}
 	@touch $@
 
-${OSM_AREAS_EXTRACTED_FLAG}: ${OSM_PBF} ${OSM_PBF_CONF}
+${OSM_AREAS_EXTRACTED_FLAG}: ${OSM_PBF} ${OSM_PBF_CONF} bucket-flags-dir
 	@echo -e "\nExtracting foreground OSM area features for ${BUCKET}..."
 	@rm -f $@ ${OSM_AREAS_SHAPEFILE}
 	ogr2ogr -oo CONFIG_FILE="${OSM_PBF_CONF}" -spat ${SPAT} -progress ${OSM_AREAS_SHAPEFILE} ${OSM_PBF} -sql "SELECT * FROM multipolygons WHERE ${OSM_AREAS_QUERY}"
 	@echo Creating spatial index...
 	ogrinfo -sql "CREATE SPATIAL INDEX ON ${BUCKET}-areas" ${OSM_AREAS_SHAPEFILE}
 	@touch $@
+
+# Extract CORINE landcover from PostgreSQL
+
+pg-landcover-extract: ${LANDCOVER_SHAPEFILE}
+
+# ${LANDCOVER_SHAPEFILE}:
+# 	@echo -e "\nExtracting PG background landcover for ${BUCKET}..."
+# 	ogr2ogr --debug ON -spat ${SPAT} -clipsrc -f "ESRI Shapefile" $@ ${LANDCOVER_PG_SOURCE} -sql "${LANDCOVER_PG_QUERY}"
+# 	@echo -e "\nCreating index for $@..."
+# 	ogrinfo -sql "CREATE SPATIAL INDEX ON ${BUCKET}" $@
 
 
 #
@@ -359,11 +444,18 @@ ${OSM_AREAS_EXTRACTED_FLAG}: ${OSM_PBF} ${OSM_PBF_CONF}
 
 airports-extract: ${AIRPORTS} # single file - no flag needed
 
-${AIRPORTS}: ${VENV} ${AIRPORTS_SOURCE}  $(wildcard ${INPUTS_DIR}/airports/custom/*.dat) ${SCRIPT_DIR}/downgrade-apt.py ${SCRIPT_DIR}/filter-airports.py
+# DO NOT DOWNGRADE AIRPORTS for latest genapts850
+${AIRPORTS}: ${VENV} ${AIRPORTS_SOURCE}  $(wildcard ${INPUTS_DIR}/airports/custom/*.dat) ${SCRIPT_DIR}/passthrough-apt.py ${SCRIPT_DIR}/filter-airports.py
 	mkdir -p ${DATA_DIR}/airports/${BUCKET}/
-	. ${VENV} && python3 ${SCRIPT_DIR}/downgrade-apt.py  ${INPUTS_DIR}/airports/custom/*.dat ${AIRPORTS_SOURCE} \
+	. ${VENV} && python3 ${SCRIPT_DIR}/passthrough-apt.py  ${INPUTS_DIR}/airports/custom/*.dat ${AIRPORTS_SOURCE} \
 	| python3 ${SCRIPT_DIR}/filter-airports.py ${BUCKET} \
 	> $@
+
+# ${AIRPORTS}: ${VENV} ${AIRPORTS_SOURCE}  $(wildcard ${INPUTS_DIR}/airports/custom/*.dat) ${SCRIPT_DIR}/downgrade-apt.py ${SCRIPT_DIR}/filter-airports.py
+# 	mkdir -p ${DATA_DIR}/airports/${BUCKET}/
+# 	. ${VENV} && python3 ${SCRIPT_DIR}/downgrade-apt.py  ${INPUTS_DIR}/airports/custom/*.dat ${AIRPORTS_SOURCE} \
+# 	| python3 ${SCRIPT_DIR}/filter-airports.py ${BUCKET} \
+# 	> $@
 
 airports-extract-clean:
 	rm -f ${AIRPORTS}
@@ -397,12 +489,13 @@ elevations-prepare-rebuild: elevations-prepare-clean elevations-prepare
 ${ELEVATIONS_FLAG}:  ${INPUTS_DIR}/${DEM}/Unpacked/${BUCKET}
 	rm -f ${ELEVATIONS_FLAG}
 	rm -rf ${WORK_DIR}/${DEM}/${BUCKET}
-	find ${INPUTS_DIR}/${DEM}/Unpacked/${BUCKET} -name '*.tif' -o -name '*.hgt' | xargs gdalchop ${WORK_DIR}/${DEM}
+	mkdir -p ${WORK_DIR}/${DEM}/${BUCKET}
+	find ${INPUTS_DIR}/${DEM}/Unpacked/${BUCKET} -name '*.tif' -o -name '*.hgt' | xargs ${TERRA_GEAR_BIN}/gdalchop ${WORK_DIR}/${DEM}
 	mkdir -p ${FLAGS_DIR} && touch ${ELEVATIONS_FLAG}
 
 ${ELEVATIONS_FIT_FLAG}: ${ELEVATIONS_FLAG}
 	rm -f ${ELEVATIONS_FIT_FLAG}
-	terrafit ${WORK_DIR}/${DEM}/${BUCKET} ${TERRAFIT_OPTS}
+	${TERRA_GEAR_BIN}/terrafit ${WORK_DIR}/${DEM}/${BUCKET} ${TERRAFIT_OPTS}
 	mkdir -p ${FLAGS_DIR} && touch ${ELEVATIONS_FIT_FLAG}
 
 #
@@ -419,9 +512,16 @@ airports-prepare-rebuild: airports-prepare-clean airports-prepare
 ${AIRPORTS_FLAG}: ${AIRPORTS} ${ELEVATIONS_FIT_FLAG}
 	rm -f ${AIRPORTS_FLAG}
 	rm -rf ${WORK_DIR}/AirportArea/${BUCKET} ${WORK_DIR}/AirportObj/${BUCKET}
-	genapts850 --input=${AIRPORTS} ${LATLON_OPTS} --max-slope=0.2618 \
+	${TERRA_GEAR_BIN}/genapts850 --input=${AIRPORTS} ${LATLON_OPTS} --max-slope=0.2618 \
 	  --work=${WORK_DIR} --dem-path=${DEM} # can't use threads here, due to errors with .idx files; not SRTM-3
 	mkdir -p ${FLAGS_DIR} && touch ${AIRPORTS_FLAG}
+
+# ${AIRPORTS_FLAG}: ${AIRPORTS} ${ELEVATIONS_FIT_FLAG}
+# 	rm -f ${AIRPORTS_FLAG}
+# 	rm -rf ${WORK_DIR}/AirportArea/${BUCKET} ${WORK_DIR}/AirportObj/${BUCKET}
+# 	genapts850 --input=${AIRPORTS} ${LATLON_OPTS} --max-slope=0.2618 \
+# 	  --work=${WORK_DIR} --dem-path=${DEM} # can't use threads here, due to errors with .idx files; not SRTM-3
+# 	mkdir -p ${FLAGS_DIR} && touch ${AIRPORTS_FLAG}
 
 #
 # Prepare the default landmass
@@ -437,7 +537,8 @@ landmass-prepare-rebuild: landmass-prepare-clean landmass-prepare
 ${LANDMASS_FLAG}: ${LANDMASS_SHAPEFILE}
 	rm -f ${LANDMASS_FLAG}
 	rm -rf ${WORK_DIR}/Default/${BUCKET}
-	ogr-decode ${DECODE_OPTS} --area-type Default ${WORK_DIR}/Default ${LANDMASS_SHAPEFILE}
+	${TERRA_GEAR_BIN}/ogr-decode ${DECODE_OPTS} --area-type Default ${WORK_DIR}/Default ${LANDMASS_SHAPEFILE}
+#	ogr-decode ${DECODE_OPTS} --area-type Default ${WORK_DIR}/Default ${LANDMASS_SHAPEFILE}
 	mkdir -p ${FLAGS_DIR} && touch ${LANDMASS_FLAG}
 
 #
@@ -458,7 +559,22 @@ ${LANDCOVER_LAYERS_FLAG}: ${LANDCOVER_SHAPEFILE} ${CONFIG_DIR}/landcover-layers.
           if [ "$$include" = 'yes' -a "$$type" = 'area' ]; then \
 	    echo -e "\nTrying $$name..."; \
 	    rm -rf ${WORK_DIR}/$$name/${BUCKET}; \
-	    ogr-decode ${DECODE_OPTS} --area-type $$material --where "$$query" \
+	    ${TERRA_GEAR_BIN}/ogr-decode ${DECODE_OPTS} --area-type $$material --where "$$query" \
+	      ${WORK_DIR}/$$name ${LANDCOVER_SHAPEFILE} || exit 1;\
+	  fi; \
+	done
+	mkdir -p ${FLAGS_DIR} && touch $@
+
+landcover-prepare-corine: ${LANDCOVER_LAYERS_CORINE_FLAG}
+
+${LANDCOVER_LAYERS_CORINE_FLAG}: ${LANDCOVER_SHAPEFILE} ${CONFIG_DIR}/landcover-corine-layers.tsv
+	rm -f $@
+	@echo -e "\nPreparing CORINE landcover area layers...\n"
+	IFS="\t" cat ${CONFIG_DIR}/landcover-corine-layers.tsv | while read name include type material line_width query; do \
+          if [ "$$include" = 'yes' -a "$$type" = 'area' ]; then \
+	    echo -e "\nTrying $$name..."; \
+	    rm -rf ${WORK_DIR}/$$name/${BUCKET}; \
+	    ${TERRA_GEAR_BIN}/ogr-decode ${DECODE_OPTS} --area-type $$material --where "$$query" \
 	      ${WORK_DIR}/$$name ${LANDCOVER_SHAPEFILE} || exit 1;\
 	  fi; \
 	done
@@ -468,6 +584,12 @@ ${LANDCOVER_LAYERS_FLAG}: ${LANDCOVER_SHAPEFILE} ${CONFIG_DIR}/landcover-layers.
 # Prepare the foreground OSM layers
 #
 
+osm-prepare-eu:
+		IFS="\t" cat ${BUCKETS_FILE} | while read -r bucket; do \
+				echo -e "osm: Preparing $$bucket..."; \
+				BUCKET=$$bucket make osm-prepare; \
+		done
+
 osm-prepare: ${OSM_AREA_LAYERS_FLAG} ${OSM_LINE_LAYERS_FLAG}
 
 osm-prepare-clean:
@@ -475,7 +597,6 @@ osm-prepare-clean:
 
 osm-prepare-rebuild: osm-prepare-clean osm-prepare
 
-osm-areas-prepare: ${OSM_AREA_LAYERS_FLAG}
 
 osm-areas-prepare-clean:
 	IFS="\t" cat ${CONFIG_DIR}/osm-layers.tsv | while read name include type material line_width query; do \
@@ -494,11 +615,11 @@ ${OSM_AREA_LAYERS_FLAG}: ${OSM_AREAS_SHAPEFILE} ${CONFIG_DIR}/osm-layers.tsv
           if [ "$$include" = 'yes' -a "$$type" = 'area' ]; then \
 	    echo -e "\nTrying $$name..."; \
 	    rm -rf ${WORK_DIR}/$$name/${BUCKET}; \
-	    ogr-decode ${DECODE_OPTS} --area-type $$material --where "$$query" \
+	    ${TERRA_GEAR_BIN}/ogr-decode ${DECODE_OPTS} --area-type $$material --where "$$query" \
 	      ${WORK_DIR}/$$name ${OSM_AREAS_SHAPEFILE} || exit 1;\
 	  fi; \
 	done
-	mkdir -p ${FLAGS_DIR} && touch $@
+	touch $@
 
 osm-lines-prepare: ${OSM_LINE_LAYERS_FLAG}
 
@@ -519,11 +640,11 @@ ${OSM_LINE_LAYERS_FLAG}: ${OSM_LINES_SHAPEFILE} ${CONFIG_DIR}/osm-layers.tsv
           if [ "$$include" = 'yes' -a "$$type" = 'line' ]; then \
 	    echo -e "\nTrying $$name..."; \
 	    rm -rf ${WORK_DIR}/$$name/${BUCKET}; \
-	    ogr-decode ${DECODE_OPTS} --texture-lines --line-width $$line_width --area-type $$material --where "$$query" \
+	    ${TERRA_GEAR_BIN}/ogr-decode ${DECODE_OPTS} --texture-lines --line-width $$line_width --area-type $$material --where "$$query" \
 	      ${WORK_DIR}/$$name ${OSM_LINES_SHAPEFILE} || exit 1;\
 	  fi; \
 	done
-	mkdir -p ${FLAGS_DIR} && touch $@
+	touch $@
 
 osm-clean:
 	rm -rfv ${WORK_DIR}/osm-*/${BUCKET} ${OSM_AREA_LAYERS_FLAG} ${OSM_LINE_LAYERS_FLAG}
@@ -532,6 +653,16 @@ osm-clean:
 ########################################################################
 # 3. Construct
 ########################################################################
+
+# scenery-eu:
+# 		IFS="\t" cat ${BUCKETS_FILE} | while read -r bucket; do \
+# 				echo -e "Building scenery for $$bucket..."; \
+# 				BUCKET=$$bucket make scenery; \
+# 		done
+
+scenery-eu:
+	tg-construct --ignore-landmass --nudge=${NUDGE} --threads=${MAX_THREADS} --work-dir=${WORK_DIR} --output-dir=${SCENERY_DIR}/Terrain \
+	  ${LATLON_OPTS} --priorities=${CONFIG_DIR}/default_priorities.txt ${PREPARE_AREAS}
 
 scenery: extract prepare
 	tg-construct --ignore-landmass --nudge=${NUDGE} --threads=${MAX_THREADS} --work-dir=${WORK_DIR} --output-dir=${SCENERY_DIR}/Terrain \
@@ -570,7 +701,7 @@ ${SCENERY_DIR}/NavData/apt/${BUCKET}.apt: ${AIRPORTS}
 
 archive: static-files navdata thresholds-clean thresholds
 	cd ${OUTPUT_DIR} \
-	  && tar cvf fgfs-canada-us-scenery-${BUCKET}-$$(date +%Y%m%d).tar ${SCENERY_NAME}/README.md ${SCENERY_NAME}/UNLICENSE.md ${SCENERY_NAME}/clean-symlinks.sh ${SCENERY_NAME}/gen-symlinks.sh ${SCENERY_NAME}/Airports ${SCENERY_NAME}/NavData/apt/${BUCKET}.dat ${SCENERY_NAME}/Terrain/${BUCKET}
+	  && tar cvf europe-scenery-${BUCKET}-$$(date +%Y%m%d).tar ${SCENERY_NAME}/README.md ${SCENERY_NAME}/UNLICENSE.md ${SCENERY_NAME}/clean-symlinks.sh ${SCENERY_NAME}/gen-symlinks.sh ${SCENERY_NAME}/Airports ${SCENERY_NAME}/NavData/apt/${BUCKET}.dat ${SCENERY_NAME}/Terrain/${BUCKET}
 
 # Will move
 publish-cloud:
